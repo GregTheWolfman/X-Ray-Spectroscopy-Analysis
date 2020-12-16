@@ -22,44 +22,35 @@
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
+#include <TText.h>
 
 
 using namespace std;
 
-void CNF_Plot_Maker(){//makes histogram of energy vs counts
+void CNF_Plot_Maker_PL_v2(){//makes histogram of energy vs counts
 
-  double height;//max range on y axis
-  double rangemax;//max x range
+  double height = 200;//max range on y axis
+  double rangemax = 1000;//max x range
   string Infi = "";
-  //string Bgrnd = "";
 
   //get user files and plot ranges
-  cout << "Sample Data File Name: ";
+  cout << "Data File Name: ";
   cin >> Infi;
   
   //open input and output file
   ifstream in;
   in.open(Infi);
   if(in.fail()){cout << "File does not exist, please try again" << endl; exit(1);}
+  
+  int xdata = 1;
+  int ydata = 0;
+  int num_t = 0;
+  int xvariable = 1;
+  int yvariable = 2;
+  int num_ydata = 0;
+  bool possiblevar = false;
 
   /*
-  //get user background file
-  cout << "Background File Name: ";
-  cin >> Bgrnd;
-  
-  //open input and output file
-  ifstream bgd;
-  bgd.open(Bgrnd);
-  if(bgd.fail()){cout << "File does not exist, please try again" << endl; exit(1);}
-  */
-  
-  int xdata = -1;
-  int ydata = -1;
-  int num_t = 0;
-  int xvariable = -1;
-  int yvariable = -1;
-  bool possiblevar = false;
-  
   while(possiblevar == false){
     cout << "X axis Data? (0=channel, 1=energy): ";
     cin >> xdata;
@@ -85,6 +76,7 @@ void CNF_Plot_Maker(){//makes histogram of energy vs counts
 
   cout << "Max height (0 for full height): " << endl;
   cin >> height;
+  */
   
   string line;
   char check;
@@ -107,11 +99,15 @@ void CNF_Plot_Maker(){//makes histogram of energy vs counts
   if(ydata == 1){plot->GetYaxis()->SetTitle("Rate [1/s]");}
   if(xdata == 0){plot->GetXaxis()->SetTitle("Channel");}
   if(xdata == 1){plot->GetXaxis()->SetTitle("Energy [keV]");}
+
+  float xrange[16384];//number of total x datum
+  float yrange[16384];//number of total x datum
+  int uiter = 0;
   
   //loop to obtain x and y values
   while(getline(in, line, '\n')){//look line by line
     if(line[0] == '#'){continue;}//skip over the beginning # section
-    cout << line << endl;
+    //cout << line << endl;
     
     for(uint i = 0; i < line.length(); i++){//look at each entry in the table in the line
       check = line[i];
@@ -141,6 +137,12 @@ void CNF_Plot_Maker(){//makes histogram of energy vs counts
     
     plot->SetPoint(iter, Engy, Act_Count);//plot!
     iter++;
+
+    if(Act_Count != 0){num_ydata++;}//count number of channels without 0 counts/rate
+    
+    xrange[uiter] = Engy;//collect all of the x datum;
+    yrange[uiter] = Act_Count;//collect all of the y datum
+    uiter++;
     
     count = "";//reset values for next line
     energy = "";
@@ -149,74 +151,50 @@ void CNF_Plot_Maker(){//makes histogram of energy vs counts
       if(Engy >= rangemax){break;}
     }
   }
+  in.clear();
+  in.seekg(0);
+  
+  if(height != 0){plot->GetYaxis()->SetRangeUser(0,height);}//change height of y axis if height != 0
+  plot->Draw();//draw!
 
-  /*
-  //now for background file:
-  string BGline;
-  char BGcheck;
+  //time to add labels to the graphs
+  float ROIs[7] = {95, 186, 240, 290, 350, 511, 609};// major peaks in data
+  float std = 4;
+  int bounds = 2;
+  int buffer = 4;
   
-  string BGcount;
-  double BGAct_Count;
-  string BGenergy;
-  double BGEngy;
-  
-  int BGiter = 0;
-
-  TGraph* BGplot = new TGraph();
-  
-  //loop to obtain x and y values
-  while(getline(bgd, BGline, '\n')){//look line by line
-    if(BGline[0] == '#'){continue;}//skip over the beginning # section
-    cout << BGline << endl;
-    
-    for(uint i = 0; i < BGline.length(); i++){//look at each entry in the table in the line
-      BGcheck = BGline[i];
-      if(BGcheck == '\t'){num_t++;}//count number of tabs
-      
-      if(num_t == yvariable){//checks number after yvariable number of tabs 
-	bit_c = BGline[i+1];//take the value after this tab
-	if(bit_c == '\t'){continue;}
-	BGcount += bit_c;//write out the whole value before the next tab
-      }
-      
-      if(num_t == xvariable){//same thing but for x data (determined in switch statement)
-	if(xvariable == 0){bit_e = BGline[i];}
-	else{bit_e = BGline[i+1];}
-	if(bit_e == '\t'){continue;}
-	BGenergy += bit_e;
-      }
+  for(uint k = 0; k < num_ydata; k++){ //cycle through the y values
+    float sum = 0;
+    float average = 0;
+    for(uint y = k-bounds; y < k+bounds; y++){
+      sum+=yrange[y];
     }
-    //reset repeated variables used for each line
-    num_t = 0;
-    bit_c = 0;
-    bit_e = 0;
-    //    cout << "B" << endl;
-    double BGAct_Count = stod(BGcount);
-    //cout << "A" << endl;
-    double BGEngy = stod(BGenergy);//change string from file to double for graph
+    average = sum/(2*bounds);
+    for(uint h = 0; h < 7; h++){
+      if(xrange[k] >= ROIs[h]-std && xrange[k] <= ROIs[h]+std){
     
-    BGplot->SetPoint(BGiter, BGEngy, BGAct_Count);//plot!
-    BGiter++;
+	if(yrange[k] >= average+buffer){
+	  cout << "Peak at: " << xrange[k] << endl;
+	  stringstream label;
+	  double error_out = trunc(sqrt(yrange[k])*100)/100;
+	  label << "(" << xrange[k] << "): " << yrange[k] << " +/- " << error_out;
+	  TLatex Tl;
     
-    BGcount = "";//reset values for next line
-    BGenergy = "";
-
-    if(rangemax != 0){//as long as the energy range is !=0, the while loop will stop reading after rangemax
-      if(BGEngy >= rangemax){break;}
+	  Tl.SetTextSize(0.03);
+	  Tl.SetTextAngle(45);
+      
+	  Tl.DrawLatex(xrange[k], yrange[k]+0.05*height, label.str().c_str());
+	}
+      }
     }
   }
-
-  TGraph* finalplot = (TGraph*)plot->Clone("FP");
-  finalplot->Add(BGplot, -1);
-  
-  if(height != 0){finalplot->GetYaxis()->SetRangeUser(0,height);}//change height of y axis if height != 0
-  finalplot->Draw();//draw!
+  /*
+    stringstream outplot;
+    outplot << Infi;
+    outplot << "_Plot.pdf";
+    //outplot.str().c_str()
+    plot->SaveAs("Plots.pdf");	       
   */
-
-   if(height != 0){plot->GetYaxis()->SetRangeUser(0,height);}//change height of y axis if height != 0
-   //if(rangemax != 0){plot->GetXaxis()->SetRangeUser(rangemin,rangemax);}//change height of y axis if height != 0
-  
-  plot->Draw();//draw!
   in.close();//close input file
 }
     

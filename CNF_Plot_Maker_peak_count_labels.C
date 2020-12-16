@@ -28,7 +28,7 @@
 using namespace std;
 
 void CNF_Plot_Maker_peak_count_labels(){//makes histogram of energy vs counts
-
+  
   double height = 200;//max range on y axis
   double rangemax = 1000;//max x range
   string Infi = "";
@@ -158,10 +158,12 @@ void CNF_Plot_Maker_peak_count_labels(){//makes histogram of energy vs counts
   plot->Draw();//draw!
 
   //time to add labels to the graphs
+  float ROIs[7] = {95, 186, 240, 290, 350, 511, 609};// major peaks in data
+  float std = 4;
   int inner_bounds = 1;//bounds for a better peak approximation at low energies
   int inner_buffer = 8;
-  int bounds = 2;
-  int buffer = 6;
+  int bounds = 3;
+  int buffer = 5;
   float low_cut_off = 200;//low energy cut off for analysis
   
   for(uint k = 0; k < num_ydata; k++){ //cycle through the y values
@@ -173,39 +175,42 @@ void CNF_Plot_Maker_peak_count_labels(){//makes histogram of energy vs counts
 	  sum+=yrange[q];
 	}
 	average = sum/(2*inner_bounds);
-	if(yrange[k] >= average+inner_buffer){//if the y value is over the threshold
-	cout << "Peak at: " << xrange[k] << endl;
-
-	stringstream inner_label;
-
-	double error = trunc(sqrt(yrange[k])*100)/100;
-	inner_label << "(" << xrange[k] << "): " << yrange[k] << " +/- " << error;
-	TLatex Tl_iner;//make the label = to the y value
-	
-	Tl_iner.SetTextSize(0.03);
-	Tl_iner.SetTextAngle(45);
-	
-	Tl_iner.DrawLatex(xrange[k], yrange[k]+0.05*height, inner_label.str().c_str()); //draw it
-      }
-	
+	for(uint h = 0; h < 7; h++){
+	  if(yrange[k] >= average+inner_buffer && xrange[k] >= ROIs[h]-std && xrange[k] <= ROIs[h]+std){//if the y value is over the threshold and at a peak location
+	    cout << "Peak at: " << xrange[k] << endl;
+	    
+	    stringstream inner_label;
+	    
+	    double error = trunc(sqrt(yrange[k])*100)/100;
+	    inner_label << "(" << xrange[k] << "): " << yrange[k] << " +/- " << error;
+	    TLatex Tl_iner;//make the label = to the y value
+	    
+	    Tl_iner.SetTextSize(0.03);
+	    Tl_iner.SetTextAngle(45);
+	    
+	    Tl_iner.DrawLatex(xrange[k], yrange[k]+0.05*height, inner_label.str().c_str()); //draw it
+	  }
+	}
       }
       if(xrange[k] >= low_cut_off){//same thing but for high energy region
 	for(uint y = k-bounds; y < k+bounds; y++){
 	  sum+=yrange[y];
 	}
 	average = sum/(2*bounds);
-	if(yrange[k] >= average+buffer){
-	  cout << "Peak at: " << xrange[k] << endl;
-
-	  stringstream label;
-	  double error_out = trunc(sqrt(yrange[k])*100)/100;
-	  label << "(" << xrange[k] << "): " << yrange[k] << " +/- " << error_out;
-	  TLatex Tl;
+	for(uint h = 0; h < 7; h++){
+	  if(yrange[k] >= average+buffer && xrange[k] >= ROIs[h]-std && xrange[k] <= ROIs[h]+std){
+	    cout << "Peak at: " << xrange[k] << endl;
+	     
+	    stringstream label;
+	    double error_out = trunc(sqrt(yrange[k])*100)/100;
+	    label << "(" << xrange[k] << "): " << yrange[k] << " +/- " << error_out;
+	    TLatex Tl;
 	  
-	  Tl.SetTextSize(0.03);
-	  Tl.SetTextAngle(45);
+	    Tl.SetTextSize(0.03);
+	    Tl.SetTextAngle(45);
 	  
-	  Tl.DrawLatex(xrange[k], yrange[k]+0.05*height, label.str().c_str());
+	    Tl.DrawLatex(xrange[k], yrange[k]+0.05*height, label.str().c_str());
+	  }
 	}
       }
     }
